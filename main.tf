@@ -50,29 +50,32 @@ resource "docker_container" "maquinas" {
   # Sintaxis correcta para Terraform 3.x
   restart = "always"
 
-  command = [
-    "bash",
-    "-c",
-    <<-EOT
-      set -e
-      apt-get update &&
-      DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo &&
+command = [
+  "bash",
+  "-c",
+  <<-EOT
+    set -e
+    apt-get update &&
+    DEBIAN_FRONTEND=noninteractive apt-get install -y openssh-server sudo &&
 
-      mkdir -p /run/sshd &&
-      ssh-keygen -A || true &&
+    mkdir -p /run/sshd &&
+    ssh-keygen -A || true &&
 
-      useradd -m -s /bin/bash alumno &&
-      echo "alumno:${random_password.alumno[count.index].result}" | chpasswd &&
+    # Crear usuarios
+    useradd -m -s /bin/bash alumno &&
+    echo "alumno:${random_password.alumno[count.index].result}" | chpasswd &&
+    useradd -m -s /bin/bash administrador &&
+    echo "administrador:${random_password.admin[count.index].result}" | chpasswd &&
+    usermod -aG sudo alumno &&
+    usermod -aG sudo administrador &&
+    echo "alumno ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers &&
+    echo "administrador ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers &&
 
-      useradd -m -s /bin/bash administrador &&
-      echo "administrador:${random_password.admin[count.index].result}" | chpasswd &&
+    # Habilitar login por contraseña en SSH
+    sed -i 's/^#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config &&
+    sed -i 's/^#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config &&
 
-      usermod -aG sudo alumno &&
-      usermod -aG sudo administrador &&
-      echo "alumno ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers &&
-      echo "administrador ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers &&
-
-      exec /usr/sbin/sshd -D
-    EOT
-  ]
+    exec /usr/sbin/sshd -D -o PasswordAuthentication=yes
+  EOT
+]
 }
